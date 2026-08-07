@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat IFPE</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        :root {
+            --wa-header: #008069;
+            --wa-bg: #efeae2;
+            --wa-sent: #d9fdd3;
+            --wa-received: #ffffff;
+            --wa-input-bg: #f0f2f5;
+            --wa-text: #111b21;
+            --wa-subtext: #667781;
+            --danger: #e53935;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #d1d7db;
+            color: var(--wa-text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .box {
+            background: #ffffff;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-body {
+            padding: 24px;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .chat-header {
+            background-color: var(--wa-header);
+            color: #ffffff;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-header h2, .chat-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        input[type="text"], input[type="email"], input[type="password"], select {
+            width: 100%;
+            padding: 12px 14px;
+            margin: 8px 0 12px 0;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            background-color: #f8f9fa;
+            outline: none;
+        }
+        input:focus, select:focus {
+            border-color: var(--wa-header);
+            background-color: #ffffff;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--wa-header);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button.btn-secondary {
+            background-color: #e4e6eb;
+            color: #4b4f56;
+        }
+        button.btn-danger {
+            background-color: var(--danger);
+        }
+        .toggle-link {
+            display: block;
+            margin-top: 14px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--wa-header);
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .toggle-link:hover {
+            text-decoration: underline;
+        }
+
+        #chat-messages {
+            height: 380px;
+            overflow-y: auto;
+            background-color: var(--wa-bg);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message-bubble {
+            max-width: 75%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.4;
+            box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+            word-break: break-word;
+            display: flex;
+            flex-direction: column;
+        }
+        .message-bubble.received {
+            align-self: flex-start;
+            background-color: var(--wa-received);
+            border-top-left-radius: 0;
+        }
+        .message-bubble.sent {
+            align-self: flex-end;
+            background-color: var(--wa-sent);
+            border-top-right-radius: 0;
+        }
+        .message-bubble .sender {
+            font-size: 11px;
+            font-weight: bold;
+            color: #128c7e;
+            margin-bottom: 2px;
+        }
+        .message-bubble.sent .sender {
+            color: #075e54;
+        }
+        .chat-input-area {
+            background-color: var(--wa-input-bg);
+            padding: 8px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .chat-input-area input {
+            margin: 0;
+            border-radius: 20px;
+            border: none;
+            background: #ffffff;
+            padding: 10px 16px;
+            flex-grow: 1;
+        }
+        .chat-input-area button {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen" class="box">
+    <div class="chat-header">
+        <h2>Chat IFPE - Login</h2>
+    </div>
+    <div class="card-body">
+        <form onsubmit="login(event)">
+            <input type="email" id="login-email" placeholder="E-mail" required>
+            <input type="password" id="login-senha" placeholder="Senha" required>
+            <button type="submit">Entrar</button>
+        </form>
+        <span class="toggle-link" onclick="mostrarCadastro()">Não tem conta? Cadastre-se</span>
+    </div>
+</div>
+
+<div id="register-screen" class="box hidden">
+    <div class="chat-header">
+        <h2>Chat IFPE - Cadastro</h2>
+    </div>
+    <div class="card-body">
+        <form onsubmit="cadastrar(event)">
+            <input type="text" id="cad-matricula" placeholder="Matrícula" required>
+            <input type="text" id="cad-nome" placeholder="Nome" required>
+            <input type="email" id="cad-email" placeholder="E-mail" required>
+            <input type="password" id="cad-senha" placeholder="Senha" required>
+            <button type="submit">Cadastrar</button>
+        </form>
+        <span class="toggle-link" onclick="mostrarLogin()">Já tem conta? Faça Login</span>
+    </div>
+</div>
+
+<div id="room-screen" class="box hidden">
+    <div class="chat-header">
+        <h2>Salas por Período</h2>
+    </div>
+    <div class="card-body">
+        <select id="periodo">
+            <option value="1">1º Período</option>
+            <option value="2">2º Período</option>
+            <option value="3">3º Período</option>
+            <option value="4">4º Período</option>
+            <option value="5">5º Período</option>
+            <option value="6">6º Período</option>
+        </select>
+        <button onclick="entrarNaSala()" style="margin-top: 10px;">Entrar na Sala</button>
+    </div>
+</div>
+
+<div id="chat-screen" class="box hidden">
+    <div class="chat-header">
+        <h3 id="chat-title">Sala de Bate-Papo</h3>
+        <button class="btn-danger" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="sairDaSala()">Sair</button>
+    </div>
+    <div id="chat-messages"></div>
+    <div class="chat-input-area">
+        <input type="text" id="msg-input" placeholder="Digite uma mensagem..." onkeypress="if(event.key === 'Enter') enviarMensagem()">
+        <button onclick="enviarMensagem()">&#10148;</button>
+    </div>
+</div>
+
+<script>
+    let token = '', matricula = '', stompClient = null, currentSubscription = null, currentPeriodo = null;
+
+    function mostrarCadastro() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('register-screen').classList.remove('hidden');
+    }
+
+    function mostrarLogin() {
+        document.getElementById('register-screen').classList.add('hidden');
+        document.getElementById('login-screen').classList.remove('hidden');
+    }
+
+    async function cadastrar(event) {
+        if (event) event.preventDefault();
+        
+        const matriculaVal = document.getElementById('cad-matricula').value.trim();
+        const nomeVal = document.getElementById('cad-nome').value.trim();
+        const emailVal = document.getElementById('cad-email').value.trim();
+        const senhaVal = document.getElementById('cad-senha').value.trim();
+
+        if (!matriculaVal || !nomeVal || !emailVal || !senhaVal) {
+            alert('Todos os campos são obrigatórios para cadastro.');
+            return;
+        }
+
+        const payload = {
+            matricula: matriculaVal,
+            nome: nomeVal,
+            email: emailVal,
+            senha: senhaVal
+        };
+
+        const res = await fetch('/auth/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert('Cadastrado com sucesso!');
+            mostrarLogin();
+        } else {
+            alert('Erro no cadastro.');
+        }
+    }
+
+    async function login(event) {
+        if (event) event.preventDefault();
+
+        const emailVal = document.getElementById('login-email').value.trim();
+        const senhaVal = document.getElementById('login-senha').value.trim();
+
+        if (!emailVal || !senhaVal) {
+            alert('Por favor, informe tanto o e-mail quanto a senha!');
+            return;
+        }
+
+        const res = await fetch('/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ login: emailVal, password: senhaVal })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            token = data.token;
+            matricula = data.matricula;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('room-screen').classList.remove('hidden');
+            conectarWebSocket();
+        } else {
+            alert('E-mail ou senha inválidos.');
+        }
+    }
+
+    function conectarWebSocket() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, () => console.log('WebSocket conectado!'));
+    }
+
+    function entrarNaSala() {
+        currentPeriodo = document.getElementById('periodo').value;
+        document.getElementById('chat-title').innerText = `Sala: ${currentPeriodo}º Período`;
+        document.getElementById('room-screen').classList.add('hidden');
+        document.getElementById('chat-screen').classList.remove('hidden');
+        document.getElementById('chat-messages').innerHTML = '';
+        currentSubscription = stompClient.subscribe(`/topic/periodo/${currentPeriodo}`, (msg) => {
+            const data = JSON.parse(msg.body);
+            const box = document.getElementById('chat-messages');
+            const isMe = data.remetente === matricula;
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isMe ? 'sent' : 'received'}`;
+            bubble.innerHTML = `<span class="sender">${data.remetente}</span><span>${data.conteudo}</span>`;
+            box.appendChild(bubble);
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    function enviarMensagem() {
+        const input = document.getElementById('msg-input');
+        if (!input.value.trim()) return;
+        stompClient.send(`/app/chat.enviar/${currentPeriodo}`, {}, JSON.stringify({
+            remetente: matricula,
+            conteudo: input.value,
+            periodo: currentPeriodo
+        }));
+        input.value = '';
+    }
+
+    function sairDaSala() {
+        if (currentSubscription) currentSubscription.unsubscribe();
+        document.getElementById('chat-screen').classList.add('hidden');
+        document.getElementById('room-screen').classList.remove('hidden');
+    }
+</script>
+</body>
+</html>
