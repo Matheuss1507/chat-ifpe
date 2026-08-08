@@ -22,7 +22,7 @@ public class SecurityConfig {
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/ws/**", "/*.html", "/css/**", "/js/**").permitAll()
+            		.requestMatchers("/", "/index.html", "/auth/**", "/ws/**", "/css/**", "/js/**", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(new JwtAuthenticationFilter(jwtUtils), UsernamePasswordAuthenticationFilter.class);
